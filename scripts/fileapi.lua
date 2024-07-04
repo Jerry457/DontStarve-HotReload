@@ -3,9 +3,7 @@ local ffi = require("ffi")
 ffi.cdef[[
 typedef char*               LPSTR;
 typedef const char*         LPCSTR;
-typedef void*               HANDLE;
-typedef void*               PVOID;
-typedef void*               LPVOID;
+typedef void*               HANDLE, PVOID, LPVOID;
 typedef int                 BOOL;
 typedef BOOL                *LPBOOL;
 typedef unsigned int        UINT;
@@ -44,6 +42,26 @@ typedef void (LPOVERLAPPED_COMPLETION_ROUTINE)(
     DWORD dwErrorCode,
     DWORD dwNumberOfBytesTransfered,
     LPOVERLAPPED lpOverlapped
+);
+
+int MultiByteToWideChar(
+    UINT     CodePage,
+    DWORD    dwFlags,
+    LPCSTR   lpMultiByteStr,
+    int      cbMultiByte,
+    LPWSTR   lpWideCharStr,
+    int      cchWideChar
+);
+
+int WideCharToMultiByte(
+    UINT     CodePage,
+    DWORD    dwFlags,
+    LPCWSTR  lpWideCharStr,
+    int      cchWideChar,
+    LPSTR    lpMultiByteStr,
+    int      cbMultiByte,
+    LPCSTR   lpDefaultChar,
+    LPBOOL   lpUsedDefaultChar
 );
 
 HANDLE CreateFileW(
@@ -89,30 +107,10 @@ DWORD GetFullPathNameW(
     LPWSTR* lpFilePart
 );
 
+DWORD GetFileAttributesW(LPCWSTR lpFileName);
+
 DWORD GetLastError();
-
-int MultiByteToWideChar(
-    UINT     CodePage,
-    DWORD    dwFlags,
-    LPCSTR   lpMultiByteStr,
-    int      cbMultiByte,
-    LPWSTR   lpWideCharStr,
-    int      cchWideChar
-);
-
-int WideCharToMultiByte(
-    UINT     CodePage,
-    DWORD    dwFlags,
-    LPCWSTR  lpWideCharStr,
-    int      cchWideChar,
-    LPSTR    lpMultiByteStr,
-    int      cbMultiByte,
-    LPCSTR   lpDefaultChar,
-    LPBOOL   lpUsedDefaultChar
-);
 ]]
-
-local CP_UTF8 = 65001
 
 local function buffer(type)
     return function(size)
@@ -120,17 +118,24 @@ local function buffer(type)
     end
 end
 
-local wcsbuf = buffer('WCHAR[?]')
-local mbsbuf = buffer('char[?]')
+local wcsbuf = buffer("WCHAR[?]")
+local mbsbuf = buffer("char[?]")
+local kernel32 = ffi.load("kernel32")
+
+local CP_UTF8 = 65001
+local INVALID_HANDLE_VALUE = ffi.cast("HANDLE", -1)
+local INVALID_FILE_ATTRIBUTES = 0xFFFFFFFF
+
+local DirectoryWatchers = {}
 
 local function string_to_wchar(s, msz, wbuf) -- string -> WCHAR[?]
     msz = msz and msz + 1 or #s + 1
     wbuf = wbuf or wcsbuf
     local wsz = ffi.C.MultiByteToWideChar(CP_UTF8, 0, s, msz, nil, 0)
-    assert(wsz > 0) -- should never happen otherwise
+    assert(wsz > 0)  -- should never happen otherwise
     local buf = wbuf(wsz)
     local sz = ffi.C.MultiByteToWideChar(CP_UTF8, 0, s, msz, buf, wsz)
-    assert(sz == wsz) -- should never happen otherwise
+    assert(sz == wsz)  -- should never happen otherwise
     return buf
 end
 
@@ -147,10 +152,7 @@ local function wchar_to_string(ws, wsz, mbuf) -- WCHAR* -> string
     return ffi.string(buf, sz - 1)
 end
 
-local INVALID_HANDLE_VALUE = ffi.cast("HANDLE", -1)
-local DirectoryWatchers = {}
-
-local function GetAbsolutePath(path)
+local function GetFullPathName(path)
     local buffer = ffi.new("WCHAR[260]")  -- MAX_PATH is 260
     local length = ffi.C.GetFullPathNameW(string_to_wchar(path), 260, buffer, nil)
     if length == 0 then
@@ -160,7 +162,24 @@ local function GetAbsolutePath(path)
     return wchar_to_string(buffer, length)
 end
 
-local function AddDirectoryWatcher(directory)
+local function FileExists(file_path)
+    local w_file_path = string_to_wchar(file_path)
+    local attributes = kernel32.GetFileAttributesW(w_file_path)
+    return attributes ~= INVALID_FILE_ATTRIBUTES
+end
+
+local function GetAbsolutePath(path)
+    local absolute_path = GetFullPathName(path)
+
+    if path:find("../mods/workshop") and not FileExists(absolute_path) then
+        local workshop_path = string.gsub(path, "%.%.%/mods/workshop%-", "../../../workshop/content/322330/")
+        absolute_path = GetFullPathName(workshop_path)
+    end
+
+    return FileExists(absolute_path) and absolute_path or nil
+end
+
+local function WatchDirectoryChange(directory)
     local watcher = DirectoryWatchers[directory]
     if not watcher then
         DirectoryWatchers[directory] = { watchfiles = {} }
@@ -190,6 +209,10 @@ local function AddDirectoryWatcher(directory)
     return watcher
 end
 
+local function GetDirectoryWatcher(directory)
+    return DirectoryWatchers[directory]
+end
+
 local function RemoveAllDirectoryWatcher()
     print("Remove all directory watcher")
     for directory, watcher in pairs(DirectoryWatchers) do
@@ -199,16 +222,33 @@ local function RemoveAllDirectoryWatcher()
     DirectoryWatchers = {}
 end
 
-local function WatchFileChange(filepath, OnFileChange, ...)
-    filepath = GetAbsolutePath(filepath)
-    local directory = filepath:match("^(.*)\\[^\\]*$")
-
-    local watcher = AddDirectoryWatcher(directory)
-    if not watcher.watchfiles[filepath] then
-        watcher.watchfiles[filepath] = {}
+local function WatchFileChange(file_path, fn, ...)
+    local absolute_path = GetAbsolutePath(file_path)
+    if not absolute_path then
+        print("could not get: \"" ..file_path .. "\" absolute path")
+        return
     end
 
-    table.insert(watcher.watchfiles[filepath], {fn = OnFileChange, params = {...}})
+    local directory = absolute_path:match("^(.*)\\[^\\]*$")
+
+    local watcher = WatchDirectoryChange(directory)
+    if not watcher.watchfiles[absolute_path] then
+        watcher.watchfiles[absolute_path] = {}
+    end
+
+    table.insert(watcher.watchfiles[absolute_path], {fn = fn, params = {...}})
+end
+
+local function GetFileWatcher(file_path)
+    local absolute_path = GetAbsolutePath(file_path)
+    if not absolute_path then
+        return
+    end
+
+    local directory = absolute_path:match("^(.*)\\[^\\]*$")
+    local directory_watcher = GetDirectoryWatcher(directory)
+
+    return directory_watcher and directory_watcher.watchfiles[absolute_path] or nil
 end
 
 local function PushDirectoryChange()
@@ -231,18 +271,18 @@ local function PushDirectoryChange()
         local offset = 0
         repeat
             local info = ffi.cast("PFILE_NOTIFY_INFORMATION", watcher.buffer + offset)
-            local filename_length = info.FileNameLength / 2  -- WCHAR is 2 bytes
-            local filename_wide = ffi.string(info.FileName, filename_length * ffi.sizeof("WCHAR"))
+            local file_name_length = info.FileNameLength / 2  -- WCHAR is 2 bytes
+            local file_name_wide = ffi.string(info.FileName, file_name_length * ffi.sizeof("WCHAR"))
 
-            local info_filename = ""
-            for i = 0, filename_length - 1 do
-                local char = ffi.cast("WCHAR*", filename_wide)[i]
-                info_filename = info_filename .. string.char(char)
+            local info_file_name = ""
+            for i = 0, file_name_length - 1 do
+                local char = ffi.cast("WCHAR*", file_name_wide)[i]
+                info_file_name = info_file_name .. string.char(char)
             end
 
             local found = false
             for filepath, filewatchers in pairs(watcher.watchfiles) do
-                if info_filename == filepath:match("[^\\]+$") then
+                if info_file_name == filepath:match("[^\\]+$") then
                     print(filepath .. " has changed")
                     for k, filewatcher in ipairs(filewatchers) do
                         filewatcher.fn(unpack(filewatcher.params))
@@ -269,8 +309,12 @@ function SimReset(...)
 end
 
 return {
+    FileExists = FileExists,
+    GetFullPathName = GetFullPathName,
     GetAbsolutePath = GetAbsolutePath,
     WatchFileChange = WatchFileChange,
-    AddDirectoryWatcher = AddDirectoryWatcher,
+    GetFileWatcher = GetFileWatcher,
+    WatchDirectoryChange = WatchDirectoryChange,
+    GetDirectoryWatcher = GetDirectoryWatcher,
     RemoveAllDirectoryWatcher = RemoveAllDirectoryWatcher,
 }

@@ -5,13 +5,14 @@ if not IsWin32() then
     return
 end
 
-HotReload = {}
-MODENV.HotReload = HotReload
+local _require = require
+local modutil = require("modutil")
 
 local UpvalueHelper = require("upvaluehelper")
-local FileWatcher = require("filewatcher")
+local FileApi = require("fileapi")
 
-local _require = require
+HotReload = {}
+MODENV.HotReload = HotReload
 
 local ClassObjectMap = setmetatable({}, { __mode = "kv" })
 
@@ -102,8 +103,8 @@ function HotReload.UpdateClass(class1, class2)
 end
 
 function HotReload.UpdateUpvalue(func1, func2)
-    assert("function" == type(func1))
-    assert("function" == type(func2))
+    assert(type(func1) == "function")
+    assert(type(func2) == "function")
 
     local upvalue_map = {}
     for i = 1, math.huge do
@@ -116,7 +117,7 @@ function HotReload.UpdateUpvalue(func1, func2)
     for i = 1, math.huge do
         local name, value = debug.getupvalue(func2, i)
         if not name then break end
-        if upvalue_map[name] then
+        if type(upvalue_map[name]) ~= "function" and type(value) ~= "function" then
             debug.setupvalue(func2, i, upvalue_map[name])
         end
     end
@@ -144,7 +145,7 @@ function HotReload.UpdateTable(table1, table2)
     local target_meta = debug.getmetatable(table1)
     local new_meta = debug.getmetatable(table2)
     if type(target_meta) == "table" and type(new_meta) == "table" then
-        HotReload.UpdateTable(target_meta, new_meta, updated_tables)
+        HotReload.UpdateTable(target_meta, new_meta)
     end
 end
 
@@ -174,8 +175,8 @@ function require(module_name, ...)
 
     if no_loaded then  -- if no loaded
         local path = resolvefilepath_soft("scripts/" .. module_name .. ".lua")
-        if path and not path:find("workshop") then
-            FileWatcher.WatchFileChange(path, HotReload.UpdateModule, module_name)
+        if path then
+            FileApi.WatchFileChange(path, HotReload.UpdateModule, module_name)
         end
     end
 
@@ -184,18 +185,51 @@ end
 
 -- hot reload prefab file
 local _LoadPrefabFile = LoadPrefabFile
-function LoadPrefabFile(filename, ...)
-    local ret = _LoadPrefabFile(filename, ...)
+function LoadPrefabFile(file_name, ...)
+    local ret = _LoadPrefabFile(file_name, ...)
     if ret then
         for i, val in ipairs(ret) do
             if type(val) == "table" and val.is_a and val:is_a(Prefab) then
-                local path = resolvefilepath("scripts/" .. filename .. ".lua")
-                if not path:find("workshop") then
-                    FileWatcher.WatchFileChange(path, _LoadPrefabFile, filename, ...)
-                end
+                local path = resolvefilepath("scripts/" .. file_name .. ".lua")
+                FileApi.WatchFileChange(path, _LoadPrefabFile, file_name, ...)
             end
         end
     end
     return ret
 end
 
+local ModsModuleData = {}
+
+function HotReload.UpdateModModule(mod, modulename)
+    local module_data = ModsModuleData[mod.modname][modulename]
+
+    mod.postinitfns = deepcopy(module_data.postinitfns)
+    mod.postinitdata = deepcopy(module_data.postinitdata)
+
+    mod.modimport(modulename)
+end
+
+for i, mod in ipairs(ModManager.mods) do
+    if not ModsModuleData[mod.modname] then
+        ModsModuleData[mod.modname] = {}
+    end
+
+    local _modimport = mod.modimport
+    mod.modimport = function(modulename, ...)
+        if not ModsModuleData[mod.modname][modulename] then  -- first load only
+            ModsModuleData[mod.modname][modulename] = {
+                postinitfns = deepcopy(mod.postinitfns),
+                postinitdata = deepcopy(mod.postinitdata)
+            }
+        end
+
+        local result = {_modimport(modulename, ...)}
+
+        local path = mod.MODROOT .. modulename .. ".lua"
+        if not FileApi.GetFileWatcher(path) then  -- first load only
+            FileApi.WatchFileChange(path, HotReload.UpdateModModule, mod, modulename)
+        end
+
+        return unpack(result)
+    end
+end
