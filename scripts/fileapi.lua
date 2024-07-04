@@ -3,7 +3,9 @@ local ffi = require("ffi")
 ffi.cdef[[
 typedef char*               LPSTR;
 typedef const char*         LPCSTR;
-typedef void*               HANDLE, PVOID, LPVOID;
+typedef void*               HANDLE;
+typedef void*               PVOID;
+typedef void*               LPVOID;
 typedef int                 BOOL;
 typedef BOOL                *LPBOOL;
 typedef unsigned int        UINT;
