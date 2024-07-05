@@ -6,7 +6,6 @@ if not IsWin32() then
 end
 
 local _require = require
-local modutil = require("modutil")
 
 local UpvalueHelper = require("upvaluehelper")
 local FileApi = require("fileapi")
@@ -133,11 +132,13 @@ function HotReload.UpdateTable(table1, table2)
     end
 
     for k, v in pairs(table2) do
-        if type(v) == "function" and type(table1[k]) == "function" then
-            HotReload.UpdateUpvalue(v, table1[k])
-            table1[k] = v
-        elseif type(v) == "table" and type(table1[k]) == "table" then
+        if type(v) == "table" and type(table1[k]) == "table" then
             HotReload.UpdateTable(table1[k], v)
+        else
+            if type(v) == "function" and type(table1[k]) == "function" then
+                HotReload.UpdateUpvalue(v, table1[k])
+            end
+            table1[k] = v
         end
     end
 
@@ -232,4 +233,23 @@ for i, mod in ipairs(ModManager.mods) do
 
         return unpack(result)
     end
+end
+
+local _LoadPOFile = LanguageTranslator.LoadPOFile
+
+function HotReload.UpdatePOFile(translator, file_name, ...)
+    _LoadPOFile(translator, file_name, ...)
+    TranslateStringTable(STRINGS)
+    for guid, ent in pairs(Ents) do
+        if ent.prefab then
+            ent.name = STRINGS.NAMES[string.upper(ent.prefab)] or "MISSING NAME"
+        end
+    end
+end
+
+function Translator:LoadPOFile(file_name, ...)
+    local path = resolvefilepath(file_name)
+    FileApi.WatchFileChange(path, HotReload.UpdatePOFile, self, file_name, ...)
+
+    return _LoadPOFile(self, file_name, ...)
 end
