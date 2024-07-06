@@ -30,7 +30,9 @@ local function PushFileChange(file_path)
         local path = resolvefilepath_soft(MODS_ROOT .. mod.modname .. "/change_file.lua")
         if path then
             local result = kleiloadlua(mod.MODROOT .. "change_file.lua")
-            if result and type(result) ~= "string" then
+            if not result or type(result) == "string" then
+                print("change_file error:", result)
+            else
                 setfenv(result, mod)
                 result()
                 if mod.change_file then

@@ -5,7 +5,7 @@
             "notMatch": "change_file\\.lua$",
             "isAsync": false,
             "autoClearConsole": true,
-            "cmd": "powershell -Command \"$path='${workspaceRelativeDir}'; $path=$path -replace '\\\\', '/'; $content=\\\"change_file=\\\"\\\"$path\\\"\\\"\\\"; $content | Out-File -FilePath \\\"${currentWorkspace}/change_file.lua\\\" -Encoding utf8\"",
+            "cmd": "powershell -Command \"$path='${workspaceRelativeDir}'; $path=$path -replace '\\\\', '/'; $content=\\\"change_file=\\\"\\\"$path\\\"\\\"\\\"; $utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($false); [System.IO.File]::WriteAllText(\\\"${currentWorkspace}/change_file.lua\\\", $content, $utf8NoBomEncoding)\"",
             "event": "onFileChange",
         }
     ],
