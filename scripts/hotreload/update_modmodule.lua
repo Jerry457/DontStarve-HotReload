@@ -32,8 +32,8 @@ local function UpdateModModule(watcher, mod, modulename, reloadfn)
 
     mod.modimport = _modimport
 
-    watcher.params[2] = rawget(_G, "OnHotReload")  -- update reloadfn
-    if watcher.params[2] then
+    watcher.params[3] = rawget(_G, "OnHotReload")  -- update reloadfn
+    if watcher.params[3] then
         _G.OnHotReload = nil
     end
 end
@@ -69,9 +69,10 @@ for i, mod in ipairs(ModManager.mods) do
         if OnHotReload then
             _G.OnHotReload = nil
         end
-
         return unpack(result)
     end
+
+    -- FileWatcher.WatchFileChange(path, UpdateModModule, mod, "modmian", mod.OnHotReload or OnHotReload)
 end
 
 local function OnHotReload()
@@ -81,5 +82,6 @@ local function OnHotReload()
 end
 
 return {
-    OnHotReload = OnHotReload
+    OnHotReload = OnHotReload,
+    ModsModuleData = ModsModuleData,
 }

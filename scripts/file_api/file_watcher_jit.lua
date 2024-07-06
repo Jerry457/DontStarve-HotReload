@@ -238,7 +238,7 @@ end
 local function WatchFileChange(file_path, fn, ...)
     local absolute_path = GetAbsolutePath(file_path)
     if not absolute_path then
-        print("could not get: \"" ..file_path .. "\" absolute path")
+        -- print("could not get: \"" ..file_path .. "\" absolute path")
         return
     end
 
