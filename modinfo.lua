@@ -2,7 +2,7 @@ name = "Hot Reload"
 author = "Jerry"
 description = "simple hot fix, will cause slower loading and more memory usage, and many be have bug"
 
-version = "0.0.1"
+version = "1.0.0"
 forumthread = ""
 
 api_version = 6

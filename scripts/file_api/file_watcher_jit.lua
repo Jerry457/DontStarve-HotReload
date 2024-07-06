@@ -1,118 +1,120 @@
 local ffi = require("ffi")
 
-ffi.cdef[[
-typedef char*               LPSTR;
-typedef const char*         LPCSTR;
-typedef void*               HANDLE;
-typedef void*               PVOID;
-typedef void*               LPVOID;
-typedef int                 BOOL;
-typedef BOOL                *LPBOOL;
-typedef unsigned int        UINT;
-typedef unsigned short      WCHAR;
-typedef unsigned long       DWORD, *ULONG_PTR;
-typedef WCHAR*              LPWSTR;
-typedef const WCHAR*        LPCWSTR;
-typedef DWORD*              LPDWORD;
+if not rawget(_G, "HotReloading") then
+    ffi.cdef[[
+        typedef char*               LPSTR;
+        typedef const char*         LPCSTR;
+        typedef void*               HANDLE;
+        typedef void*               PVOID;
+        typedef void*               LPVOID;
+        typedef int                 BOOL;
+        typedef BOOL                *LPBOOL;
+        typedef unsigned int        UINT;
+        typedef unsigned short      WCHAR;
+        typedef unsigned long       DWORD, *ULONG_PTR;
+        typedef WCHAR*              LPWSTR;
+        typedef const WCHAR*        LPCWSTR;
+        typedef DWORD*              LPDWORD;
 
-static const DWORD WAIT_OBJECT_0 = 0;
-static const DWORD INFINITE = 0xFFFFFFFF;
-static const DWORD FILE_NOTIFY_CHANGE_LAST_WRITE = 0x00000010;
-static const DWORD FILE_LIST_DIRECTORY = 0x0001;
+        static const DWORD WAIT_OBJECT_0 = 0;
+        static const DWORD INFINITE = 0xFFFFFFFF;
+        static const DWORD FILE_NOTIFY_CHANGE_LAST_WRITE = 0x00000010;
+        static const DWORD FILE_LIST_DIRECTORY = 0x0001;
 
-typedef struct _OVERLAPPED {
-    ULONG_PTR Internal;
-    ULONG_PTR InternalHigh;
-    union {
-        struct {
-            DWORD Offset;
-            DWORD OffsetHigh;
-        } DUMMYSTRUCTNAME;
-        PVOID Pointer;
-    } DUMMYUNIONNAME;
-    HANDLE    hEvent;
-} OVERLAPPED, *LPOVERLAPPED;
+        typedef struct _OVERLAPPED {
+            ULONG_PTR Internal;
+            ULONG_PTR InternalHigh;
+            union {
+                struct {
+                    DWORD Offset;
+                    DWORD OffsetHigh;
+                } DUMMYSTRUCTNAME;
+                PVOID Pointer;
+            } DUMMYUNIONNAME;
+            HANDLE    hEvent;
+        } OVERLAPPED, *LPOVERLAPPED;
 
-typedef struct _FILE_NOTIFY_INFORMATION {
-    DWORD NextEntryOffset;
-    DWORD Action;
-    DWORD FileNameLength;
-    WCHAR FileName[1];
-} FILE_NOTIFY_INFORMATION, *PFILE_NOTIFY_INFORMATION;
+        typedef struct _FILE_NOTIFY_INFORMATION {
+            DWORD NextEntryOffset;
+            DWORD Action;
+            DWORD FileNameLength;
+            WCHAR FileName[1];
+        } FILE_NOTIFY_INFORMATION, *PFILE_NOTIFY_INFORMATION;
 
-typedef void (LPOVERLAPPED_COMPLETION_ROUTINE)(
-    DWORD dwErrorCode,
-    DWORD dwNumberOfBytesTransfered,
-    LPOVERLAPPED lpOverlapped
-);
+        typedef void (LPOVERLAPPED_COMPLETION_ROUTINE)(
+            DWORD dwErrorCode,
+            DWORD dwNumberOfBytesTransfered,
+            LPOVERLAPPED lpOverlapped
+        );
 
-int MultiByteToWideChar(
-    UINT     CodePage,
-    DWORD    dwFlags,
-    LPCSTR   lpMultiByteStr,
-    int      cbMultiByte,
-    LPWSTR   lpWideCharStr,
-    int      cchWideChar
-);
+        int MultiByteToWideChar(
+            UINT     CodePage,
+            DWORD    dwFlags,
+            LPCSTR   lpMultiByteStr,
+            int      cbMultiByte,
+            LPWSTR   lpWideCharStr,
+            int      cchWideChar
+        );
 
-int WideCharToMultiByte(
-    UINT     CodePage,
-    DWORD    dwFlags,
-    LPCWSTR  lpWideCharStr,
-    int      cchWideChar,
-    LPSTR    lpMultiByteStr,
-    int      cbMultiByte,
-    LPCSTR   lpDefaultChar,
-    LPBOOL   lpUsedDefaultChar
-);
+        int WideCharToMultiByte(
+            UINT     CodePage,
+            DWORD    dwFlags,
+            LPCWSTR  lpWideCharStr,
+            int      cchWideChar,
+            LPSTR    lpMultiByteStr,
+            int      cbMultiByte,
+            LPCSTR   lpDefaultChar,
+            LPBOOL   lpUsedDefaultChar
+        );
 
-HANDLE CreateFileW(
-    LPCWSTR lpFileName,
-    DWORD dwDesiredAccess,
-    DWORD dwShareMode,
-    LPVOID lpSecurityAttributes,
-    DWORD dwCreationDisposition,
-    DWORD dwFlagsAndAttributes,
-    HANDLE hTemplateFile
-);
+        HANDLE CreateFileW(
+            LPCWSTR lpFileName,
+            DWORD dwDesiredAccess,
+            DWORD dwShareMode,
+            LPVOID lpSecurityAttributes,
+            DWORD dwCreationDisposition,
+            DWORD dwFlagsAndAttributes,
+            HANDLE hTemplateFile
+        );
 
-HANDLE CreateEventW(
-    LPVOID lpEventAttributes,
-    BOOL bManualReset,
-    BOOL bInitialState,
-    LPCWSTR lpName
-);
+        HANDLE CreateEventW(
+            LPVOID lpEventAttributes,
+            BOOL bManualReset,
+            BOOL bInitialState,
+            LPCWSTR lpName
+        );
 
-BOOL ReadDirectoryChangesW(
-    HANDLE hDirectory,
-    LPVOID lpBuffer,
-    DWORD nBufferLength,
-    BOOL bWatchSubtree,
-    DWORD dwNotifyFilter,
-    LPDWORD lpBytesReturned,
-    LPOVERLAPPED lpOverlapped,
-    LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
-);
+        BOOL ReadDirectoryChangesW(
+            HANDLE hDirectory,
+            LPVOID lpBuffer,
+            DWORD nBufferLength,
+            BOOL bWatchSubtree,
+            DWORD dwNotifyFilter,
+            LPDWORD lpBytesReturned,
+            LPOVERLAPPED lpOverlapped,
+            LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+        );
 
-BOOL CloseHandle(
-    HANDLE hObject
-);
+        BOOL CloseHandle(
+            HANDLE hObject
+        );
 
-BOOL ResetEvent(
-    HANDLE hEvent
-);
+        BOOL ResetEvent(
+            HANDLE hEvent
+        );
 
-DWORD GetFullPathNameW(
-    LPCWSTR lpFileName,
-    DWORD nBufferLength,
-    LPWSTR lpBuffer,
-    LPWSTR* lpFilePart
-);
+        DWORD GetFullPathNameW(
+            LPCWSTR lpFileName,
+            DWORD nBufferLength,
+            LPWSTR lpBuffer,
+            LPWSTR* lpFilePart
+        );
 
-DWORD GetFileAttributesW(LPCWSTR lpFileName);
+        DWORD GetFileAttributesW(LPCWSTR lpFileName);
 
-DWORD GetLastError();
-]]
+        DWORD GetLastError();
+        ]]
+end
 
 local function buffer(type)
     return function(size)
@@ -128,7 +130,16 @@ local CP_UTF8 = 65001
 local INVALID_HANDLE_VALUE = ffi.cast("HANDLE", -1)
 local INVALID_FILE_ATTRIBUTES = 0xFFFFFFFF
 
-local DirectoryWatchers = {}
+local DirectoryWatchers = {
+    --[[
+    [directory_path] = {
+        watchfiles = {
+            {fn = fn, params = { ... } },
+            {fn = fn, params = { ... } }
+        }
+    }
+    --]]
+}
 
 local function string_to_wchar(s, msz, wbuf) -- string -> WCHAR[?]
     msz = msz and msz + 1 or #s + 1
@@ -215,7 +226,7 @@ local function GetDirectoryWatcher(directory)
     return DirectoryWatchers[directory]
 end
 
-local function RemoveAllDirectoryWatcher()
+local function RemoveAllWatcher()
     print("Remove all directory watcher")
     for directory, watcher in pairs(DirectoryWatchers) do
         ffi.C.CloseHandle(watcher.handle)
@@ -241,7 +252,7 @@ local function WatchFileChange(file_path, fn, ...)
     table.insert(watcher.watchfiles[absolute_path], {fn = fn, params = {...}})
 end
 
-local function GetFileWatcher(file_path)
+local function GetFileWatchers(file_path)
     local absolute_path = GetAbsolutePath(file_path)
     if not absolute_path then
         return
@@ -253,7 +264,7 @@ local function GetFileWatcher(file_path)
     return directory_watcher and directory_watcher.watchfiles[absolute_path] or nil
 end
 
-local function PushDirectoryChange()
+local function PushFileChange()
     for directory, watcher in pairs(DirectoryWatchers) do
         local success = ffi.C.ReadDirectoryChangesW(
             watcher.handle,
@@ -287,7 +298,7 @@ local function PushDirectoryChange()
                 if info_file_name == filepath:match("[^\\]+$") then
                     print(filepath .. " has changed")
                     for k, filewatcher in ipairs(filewatchers) do
-                        filewatcher.fn(unpack(filewatcher.params))
+                        filewatcher.fn(filewatcher, unpack(filewatcher.params))
                     end
                     found = true
                     break
@@ -302,21 +313,14 @@ local function PushDirectoryChange()
     end
 end
 
-local DirectoryChangeWatcher = staticScheduler:ExecutePeriodic(1, PushDirectoryChange)
-
-local _SimReset = SimReset
-function SimReset(...)
-    RemoveAllDirectoryWatcher()
-    return _SimReset(...)
-end
-
 return {
     FileExists = FileExists,
     GetFullPathName = GetFullPathName,
     GetAbsolutePath = GetAbsolutePath,
     WatchFileChange = WatchFileChange,
-    GetFileWatcher = GetFileWatcher,
+    GetFileWatchers = GetFileWatchers,
+    PushFileChange = PushFileChange,
     WatchDirectoryChange = WatchDirectoryChange,
     GetDirectoryWatcher = GetDirectoryWatcher,
-    RemoveAllDirectoryWatcher = RemoveAllDirectoryWatcher,
+    RemoveAllWatcher = RemoveAllWatcher,
 }
