@@ -1,3 +1,4 @@
+local Proxy = require("hotreload/proxy_function")
 local UpvalueHelper = require("upvaluehelper")
 local UpdateUpvalue = require("hotreload/update_upvalue")
 
@@ -89,41 +90,65 @@ local function UpdateClass(class1, class2)
     end
 end
 
-local function UpdateTable(table1, table2)
-    assert("table" == type(table1))
-    assert("table" == type(table2))
+local function UpdateTable(t1, t2, visited)
+    assert("table" == type(t1))
+    assert("table" == type(t2))
 
-    -- if is class, update class
-    if table1.is_class and table1:is_class() and table2 and table2:is_class() then
-        return UpdateClass(table1, table2)
+    local visited = visited or setmetatable({}, {__mode = "k"})
+    if visited[t2] then
+        return
+    end
+    visited[t2] = true
+
+    if t1.is_class and t1:is_class() and t2 and t2:is_class() then
+        return UpdateClass(t1, t2)
     end
 
-    for k, v in pairs(table2) do
-        if type(v) == "table" and type(table1[k]) == "table" then
-            UpdateTable(table1[k], v)
+    for k, v in pairs(t2) do
+        if type(v) == "table" and type(t1[k]) == "table" then
+            UpdateTable(t1[k], v)
         else
-            if type(v) == "function" and type(table1[k]) == "function" and k ~= "OnHotReload" then
-                UpdateUpvalue(v, table1[k])
+            if type(v) == "function" and type(t1[k]) == "function" then
+                UpdateUpvalue(v, t1[k])
             end
-            table1[k] = v
+            t1[k] = v
         end
     end
 
     -- update metatable
-    local target_meta = debug.getmetatable(table1)
-    local new_meta = debug.getmetatable(table2)
+    local target_meta = debug.getmetatable(t1)
+    local new_meta = debug.getmetatable(t2)
     if type(target_meta) == "table" and type(new_meta) == "table" then
         UpdateTable(target_meta, new_meta)
     end
 end
 
+local function UpdateModuleTable(module_name, t1, t2, visited)
+    assert("table" == type(t1))
+    assert("table" == type(t2))
+
+    -- if is class, update class
+    if t1.is_class and t1:is_class() and t2 and t2:is_class() then
+        return UpdateClass(t1, t2)
+    end
+
+    Proxy.UpdateProxyFuctinonTable(module_name, t1, t2)
+
+    -- update metatable
+    local t1_meta = debug.getmetatable(t1)
+    local t2_meta = debug.getmetatable(t2)
+    if type(t1_meta) == "table" and type(t2_meta) == "table" then
+        UpdateTable(t1_meta, t2_meta)
+    end
+end
+
 local function OnHotReload()
-    package.loaded["hotreload/update_upvalue"] = nil
     Class = _Class
 end
 
 return {
     UpdateClass = UpdateClass,
     UpdateTable = UpdateTable,
+    UpdateModuleTable = UpdateModuleTable,
     OnHotReload = OnHotReload
 }

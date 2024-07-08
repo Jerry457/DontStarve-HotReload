@@ -14,7 +14,7 @@ local function UpdateUpvalue(fn1, fn2)
     for i = 1, math.huge do
         local name, value = debug.getupvalue(fn1, i)
         if not name then break end
-        if type(upvalue_map[name]) ~= "function" and type(value) ~= "function" then
+        if upvalue_map[name] ~= nil and type(upvalue_map[name]) ~= "function" and type(value) ~= "function"  then
             debug.setupvalue(fn1, i, upvalue_map[name])
         end
     end

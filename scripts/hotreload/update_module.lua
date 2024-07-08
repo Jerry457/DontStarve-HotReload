@@ -1,3 +1,5 @@
+local hidefn = require("fnhider")
+local Proxy = require("hotreload/proxy_function")
 local UpdateTable = require("hotreload/update_table")
 local FileWatcher = require("file_api/file_watcher")
 
@@ -33,26 +35,39 @@ local function UpdateModule(watcher, module_name, reloadfn)
     local module = package.loaded[module_name]
 
     if type(module) == "table" and type(_module) == "table" then
-        UpdateTable.UpdateTable(_module, module)
+        UpdateTable.UpdateModuleTable(module_name, _module, module)
         package.loaded[module_name] = _module
+    elseif type(module) == "fucntion" and type(_module) == "fucntion" then
+        Proxy.UpdateProxyFunction(module_name, module)
     end
     print("replaced succeed")
 end
 
-function require(module_name, ...)
-    local ret = {_require(module_name)}
+local ProxyTable = {}
+function require(module_name)
+    local no_loaded = package.loaded[module_name] == nil
+    local ret = _require(module_name)
+
+    if type(ret) == "function" and not Proxy.HasProxy(module_name) then
+        package.loaded[module_name] = Proxy.ProxyFuctinon(module_name, ret)
+    elseif type(ret) == "table" and not ProxyTable[ret] then
+        ProxyTable[ret] = true
+        Proxy.ProxyTableFuctinon(module_name, ret)
+    end
 
     local OnHotReload = rawget(_G, "OnHotReload")
     local path = resolvefilepath_soft("scripts/" .. module_name .. ".lua")
     if path and not FileWatcher.GetFileWatchers(path) then  -- first load only
         FileWatcher.WatchFileChange(path, UpdateModule, module_name, OnHotReload)
     end
+
     if OnHotReload then
         _G.OnHotReload = nil
     end
 
-    return unpack(ret)
+    return package.loaded[module_name]
 end
+hidefn(require, _require)
 
 local function OnHotReload()
     require = _require

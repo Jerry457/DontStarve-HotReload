@@ -15,8 +15,6 @@ function SimReset(...)
 end
 
 local function OnHotReload()
-    package.loaded["file_api/file_watcher_normal"] = nil
-    package.loaded["file_api/file_watcher_jit"] = nil
     SimReset = _SimReset
     FileChangeWatcher:Cancel()
 end

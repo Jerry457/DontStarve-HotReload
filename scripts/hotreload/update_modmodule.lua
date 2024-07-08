@@ -11,7 +11,7 @@ local ModsModuleData = {
     ]]
 }
 
-local function UpdateModModule(watcher, mod, modulename, reloadfn)
+local function UpdateModModule(watcher, mod, modulename, reloadfn_key, reloadfn)
     if reloadfn then
         reloadfn()
     end
@@ -32,11 +32,16 @@ local function UpdateModModule(watcher, mod, modulename, reloadfn)
 
     mod.modimport = _modimport
 
-    watcher.params[3] = rawget(_G, "OnHotReload")  -- update reloadfn
-    if watcher.params[3] then
-        _G.OnHotReload = nil
-    end
+    watcher.params[4] = mod[reloadfn_key]  -- update reloadfn
+    mod[reloadfn_key] = nil
+
+    print("replaced mod module success")
 end
+
+local mainfiles = {
+    modmain = "OnHotReloadModmain",
+    modworldgenmain = "OnHotReloadModWorldgenmain"
+}
 
 for i, mod in ipairs(ModManager.mods) do
     if not ModsModuleData[mod.modname] then
@@ -60,19 +65,27 @@ for i, mod in ipairs(ModManager.mods) do
         local result = {_modimport(modulename, ...)}
 
         local path = mod.MODROOT .. modulename
-        local OnHotReload = rawget(_G, "OnHotReload")
         if not FileWatcher.GetFileWatchers(path) then  -- first load only
-            FileWatcher.WatchFileChange(path, UpdateModModule, mod, modulename, mod.OnHotReload or OnHotReload)
+            FileWatcher.WatchFileChange(path, UpdateModModule, mod, modulename, "OnHotReload", mod.OnHotReload)
         end
 
         mod.OnHotReload = nil
-        if OnHotReload then
-            _G.OnHotReload = nil
-        end
         return unpack(result)
     end
 
-    -- FileWatcher.WatchFileChange(path, UpdateModModule, mod, "modmian", mod.OnHotReload or OnHotReload)
+    for file_name, reloadfn_key in pairs(mainfiles) do
+        if not ModsModuleData[mod.modname][file_name] then  -- first load only
+            ModsModuleData[mod.modname][file_name] = {
+                postinitfns = deepcopy(mod.postinitfns),
+                postinitdata = deepcopy(mod.postinitdata)
+            }
+        end
+
+        local main_file_path = resolvefilepath_soft(mod.MODROOT .. file_name .. ".lua")
+        if main_file_path and not FileWatcher.GetFileWatchers(main_file_path) then
+            FileWatcher.WatchFileChange(main_file_path, UpdateModModule, mod, file_name, reloadfn_key, mod[reloadfn_key])
+        end
+    end
 end
 
 local function OnHotReload()

@@ -25,11 +25,23 @@ local function RemoveAllWatcher()
     FileChangeWatchers = {}
 end
 
+local change_file_name = "client.lua"
+if TheNet:GetIsMasterSimulation() then  -- ismastersim
+    local TheShard = rawget(_G, "TheShard")
+    if not TheShard or not TheShard:IsSecondary() then
+        change_file_name = "master.lua"
+    else
+        change_file_name = "cave.lua"
+    end
+end
+local change_file_path = "change_file/".. change_file_name
+
 local function PushFileChange(file_path)
     for i, mod in ipairs(ModManager.mods) do
-        local path = resolvefilepath_soft(MODS_ROOT .. mod.modname .. "/change_file.lua")
+
+        local path = resolvefilepath_soft(MODS_ROOT .. mod.modname .. "/" .. change_file_path)
         if path then
-            local result = kleiloadlua(mod.MODROOT .. "change_file.lua")
+            local result = kleiloadlua(mod.MODROOT .. change_file_path)
             if not result or type(result) == "string" then
                 print("change_file error:", result)
             else

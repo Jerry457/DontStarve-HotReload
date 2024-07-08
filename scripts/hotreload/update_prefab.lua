@@ -1,3 +1,4 @@
+local hidefn = require("fnhider")
 local FileWatcher = require("file_api/file_watcher")
 
 -- hot reload prefab file
@@ -19,11 +20,13 @@ function LoadPrefabFile(file_name, ...)
     end
     return ret
 end
+hidefn(LoadPrefabFile, _LoadPrefabFile)
 
 local function OnHotReload()
     LoadPrefabFile = _LoadPrefabFile
 end
 
 return {
-    OnHotReload = OnHotReload
+    OnHotReload = OnHotReload,
+    UpdatePrefabFile = UpdatePrefabFile,
 }

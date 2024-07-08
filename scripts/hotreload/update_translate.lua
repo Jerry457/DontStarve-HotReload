@@ -1,3 +1,4 @@
+local hidefn = require("fnhider")
 local FileWatcher = require("file_api/file_watcher")
 
 local _LoadPOFile = LanguageTranslator.LoadPOFile
@@ -17,6 +18,7 @@ function Translator:LoadPOFile(file_name, ...)
 
     return _LoadPOFile(self, file_name, ...)
 end
+hidefn(_LoadPOFile, LanguageTranslator.LoadPOFile)
 
 local function OnHotReload()
     LanguageTranslator.LoadPOFile = _LoadPOFile
